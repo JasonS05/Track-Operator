@@ -1,0 +1,39 @@
+body {
+	font-family: Helvetica;
+	background-color: #202020;
+	color: white;
+	padding: 0;
+	margin: 0;
+	border: none;
+}
+
+header {
+	text-align: center;
+	background-color: #007fff;
+	color: black;
+	padding: 0;
+	margin: 0;
+	border: none;
+}
+
+h2 {
+	padding: 10px;
+	margin: 0;
+	border: none;
+}
+
+main {
+	padding-left: 50px;
+	padding-right: 50px;
+	padding-top: 10px;
+}
+
+#canvasContainer {
+	text-align: center;
+}
+
+canvas {
+	border: 2px solid black;
+	background-color: white;
+}
+
