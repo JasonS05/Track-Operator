@@ -34,6 +34,9 @@ main {
 
 canvas {
 	border: 2px solid black;
-	background-color: white;
+	background-color: #bbbbbb;
+	image-rendering: pixelated;
+	width: 872px;
+	height: 408px;
 }
 
