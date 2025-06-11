@@ -14,12 +14,18 @@ let currentLevel = {
 
 let levelData = initializeLevelData();
 
+let cursorLocation = {
+	x: -1,
+	y: -1
+};
+
 async function main() {
 	can = document.getElementById("can");
 	ctx = can.getContext("2d");
 
 	let promise = fetchSprite();
 
+	assignEventHandlers();
 	loadLevel(1);
 
 	await promise;
@@ -31,6 +37,18 @@ function mainLoop() {
 	render();
 
 	requestAnimationFrame(mainLoop);
+}
+
+function assignEventHandlers() {
+	can.addEventListener("mouseleave", function() {
+		cursorLocation.x = -1;
+		cursorLocation.y = -1;
+	});
+
+	can.addEventListener("mousemove", function(event) {
+		cursorLocation.x = event.offsetX / 2 - 2;
+		cursorLocation.y = event.offsetY / 2 - 2;
+	});
 }
 
 function render() {
@@ -54,6 +72,27 @@ function render() {
 					imageData.data[canvasIndex + 3] = sprite.data[spriteIndex + 3];
 				}
 			}
+		}
+	}
+
+	for (let pixelY = 0; pixelY < 16; pixelY++) {
+		for (let pixelX = 0; pixelX < 16; pixelX++) {
+			let x = currentLevel.map.x * 16 + pixelX;
+			let y = currentLevel.map.y * 16 + pixelY;
+
+			let [spriteX, spriteY] = getSpritePixelCoords({type: "map"}, pixelX, pixelY);
+
+			let spriteIndex = 4 * (spriteX + 256 * spriteY);
+			let canvasIndex = 4 * (x + 432 * y);
+
+			let spriteAlpha = sprite.data[spriteIndex + 3];
+			let canvasAlpha = imageData.data[canvasIndex + 3];
+
+			// assumes data uses premultiplied alpha
+			imageData.data[canvasIndex + 0] = sprite.data[spriteIndex + 0] + imageData.data[canvasIndex + 0] * (255 - spriteAlpha) / 255;
+			imageData.data[canvasIndex + 1] = sprite.data[spriteIndex + 1] + imageData.data[canvasIndex + 1] * (255 - spriteAlpha) / 255;
+			imageData.data[canvasIndex + 2] = sprite.data[spriteIndex + 2] + imageData.data[canvasIndex + 2] * (255 - spriteAlpha) / 255;
+			imageData.data[canvasIndex + 3] = 255 - (255 - spriteAlpha) * (255 - canvasAlpha) / 255;
 		}
 	}
 
@@ -96,39 +135,61 @@ function render() {
 		}
 	}
 
+	let buttonLocation = {
+		x: 13 * 16,
+		y: 11 * 16
+	};
+
 	for (let pixelY = 0; pixelY < 16; pixelY++) {
 		for (let pixelX = 0; pixelX < 16; pixelX++) {
-			let x = currentLevel.map.x * 16 + pixelX;
-			let y = currentLevel.map.y * 16 + pixelY;
+			let x = buttonLocation.x + pixelX;
+			let y = buttonLocation.y + pixelY;
 
-			let spriteX =   0 + pixelX;
-			let spriteY = 240 + pixelY;
+			let buttonType = "playButton1";
+
+			if (
+				cursorLocation.x >= buttonLocation.x      &&
+				cursorLocation.x <  buttonLocation.x + 16 &&
+				cursorLocation.y >= buttonLocation.y      &&
+				cursorLocation.y <  buttonLocation.y + 16
+			) {
+				buttonType = "playButton2";
+			}
+
+			let [spriteX, spriteY] = getSpritePixelCoords({type: buttonType}, pixelX, pixelY);
 
 			let spriteIndex = 4 * (spriteX + 256 * spriteY);
 			let canvasIndex = 4 * (x + 432 * y);
 
-			let spriteAlpha = sprite.data[spriteIndex + 3];
-			let canvasAlpha = imageData.data[canvasIndex + 3];
-
-			// assumes data uses premultiplied alpha
-			imageData.data[canvasIndex + 0] = sprite.data[spriteIndex + 0] + imageData.data[canvasIndex + 0] * (255 - spriteAlpha) / 255;
-			imageData.data[canvasIndex + 1] = sprite.data[spriteIndex + 1] + imageData.data[canvasIndex + 1] * (255 - spriteAlpha) / 255;
-			imageData.data[canvasIndex + 2] = sprite.data[spriteIndex + 2] + imageData.data[canvasIndex + 2] * (255 - spriteAlpha) / 255;
-			imageData.data[canvasIndex + 3] = 255 - (255 - spriteAlpha) * (255 - canvasAlpha) / 255;
+			imageData.data[canvasIndex + 0] = sprite.data[spriteIndex + 0];
+			imageData.data[canvasIndex + 1] = sprite.data[spriteIndex + 1];
+			imageData.data[canvasIndex + 2] = sprite.data[spriteIndex + 2];
+			imageData.data[canvasIndex + 3] = sprite.data[spriteIndex + 3];
 		}
 	}
 
-	ctx.putImageData(imageData, 1, 1);
+	ctx.putImageData(imageData, 2, 2);
 }
 
 let mapping1 = {
-	"turn": [0, 0],
-	"straight": [0, 1],
-	"TJunctionOff": [0, 2],
-	"TJunctionOn": [0, 3],
-	"YJunction": [0, 4],
-	"crossroads": [0, 5],
-	"arrow": [9.875, 13]
+	"turn"        : [0,     0 ],
+	"straight"    : [0,     1 ],
+	"TJunctionOff": [0,     2 ],
+	"TJunctionOn" : [0,     3 ],
+	"YJunction"   : [0,     4 ],
+	"crossroads"  : [0,     5 ],
+	"arrow"       : [9.875, 13],
+	"map"         : [0,     15],
+	"playButton1" : [15,    0 ],
+	"playButton2" : [14,    0 ],
+	"stopButton1" : [15,    2 ],
+	"stopButton2" : [14,    2 ],
+	"rightButton1": [15,    4 ],
+	"rightButton2": [14,    4 ],
+	"rightButton3": [13,    4 ],
+	"leftButton1" : [15,    5 ],
+	"leftButton2" : [14,    5 ],
+	"leftButton3" : [13,    5 ]
 };
 
 function getSpritePixelCoords(obj, x, y) {
@@ -275,7 +336,7 @@ function initializeLevelData() {
 				x: 10,
 				y: 5
 			},
-			data: "s>10t>$_10sv$_10sv$_10sv$_10sv$_10sv$_10sv"
+			data: "s>270"
 		}
 	]
 }
