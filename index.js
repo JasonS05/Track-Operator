@@ -6,9 +6,11 @@ let can;
 let ctx;
 let spriteSheet;
 
-let levelsUnlocked = 1;
+const speed = 5;
+
 let mapCollected = false;
 let isPlaying = false;
+let unregisteredChange = true;
 
 let currentLevel = {
 	data: new Array(270)
@@ -21,8 +23,18 @@ let cursorLocation = {
 	y: -1
 };
 
+let backButtonLocation = {
+	x: 0.5 * 16,
+	y: 11 * 16
+};
+
 let playButtonLocation = {
 	x: 13 * 16,
+	y: 11 * 16
+};
+
+let forwardButtonLocation = {
+	x: 25.5 * 16,
 	y: 11 * 16
 };
 
@@ -48,21 +60,30 @@ function mainLoop() {
 	let dt = newTime - currentTime;
 	currentTime = newTime;
 
+	if (!parseInt(localStorage.getItem("levelsUnlocked"))) {
+		localStorage.setItem("levelsUnlocked", "1");
+	}
+
 	let steve = currentLevel.steve;
 
 	if (!isPlaying) {
 		steve.x = steve.spawnX;
 		steve.y = steve.spawnY;
 		steve.direction = steve.spawnDirection;
+
+		if (unregisteredChange) {
+			unregisteredChange = false;
+			render();
+		}
 	} else {
 		timeElapsed += dt;
 
-		if (timeElapsed >= 0.1) {
-			dt -= timeElapsed - 0.1;
+		if (timeElapsed >= 1 / speed) {
+			dt -= timeElapsed - 1 / speed;
 			timeElapsed = 0;
 		}
 
-		let movement = dt * 10;
+		let movement = dt * speed;
 
 		switch (steve.direction) {
 		case "north":
@@ -87,7 +108,7 @@ function mainLoop() {
 			steve.y = Math.round(steve.y);
 
 			if (steve.x === currentLevel.map.x && steve.y === currentLevel.map.y) {
-				levelsUnlocked = currentLevel.number + 1;
+				localStorage.setItem("levelsUnlocked", (currentLevel.number + 1).toString());
 				mapCollected = true;
 			}
 
@@ -124,7 +145,7 @@ function mainLoop() {
 					}
 
 					if (localDirection === "north") {
-						localDirection = "west";
+						localDirection = "east";
 					}
 
 					break;
@@ -140,9 +161,9 @@ function mainLoop() {
 				steve.direction = transformDirection(localDirection, tile.direction, tile.flipped, true);
 			}
 		}
-	}
 
-	render();
+		render();
+	}
 
 	requestAnimationFrame(mainLoop);
 }
@@ -197,45 +218,71 @@ function assignEventHandlers() {
 	can.addEventListener("mouseleave", function() {
 		cursorLocation.x = -1;
 		cursorLocation.y = -1;
+
+		unregisteredChange = true;
 	});
 
 	can.addEventListener("mousemove", function(event) {
 		cursorLocation.x = event.offsetX / 2 - 2;
 		cursorLocation.y = event.offsetY / 2 - 2;
-	});
 
-	let clickStart = {
-		x: -1,
-		y: -1
-	};
+		unregisteredChange = true;
+	});
 
 	can.addEventListener("mousedown", function(event) {
-		clickStart.x = event.offsetX / 2 - 2;
-		clickStart.y = event.offsetY / 2 - 2;
-	});
-
-	can.addEventListener("mouseup", function(event) {
-		let clickEnd = {
+		let click = {
 			x: event.offsetX / 2 - 2,
 			y: event.offsetY / 2 - 2
 		};
 
 		if (
-			clickStart.x >= playButtonLocation.x      &&
-			clickStart.x <  playButtonLocation.x + 16 &&
-			clickStart.y >= playButtonLocation.y      &&
-			clickStart.y <  playButtonLocation.y + 16 &&
-			clickEnd  .x >= playButtonLocation.x      &&
-			clickEnd  .x <  playButtonLocation.x + 16 &&
-			clickEnd  .y >= playButtonLocation.y      &&
-			clickEnd  .y <  playButtonLocation.y + 16
+			click.x >= playButtonLocation.x      &&
+			click.x <  playButtonLocation.x + 16 &&
+			click.y >= playButtonLocation.y      &&
+			click.y <  playButtonLocation.y + 16
 		) {
 			isPlaying = !isPlaying;
 
 			if (isPlaying === false) {
 				mapCollected = false;
 			}
+			
+			return;
+		} else if (
+			click.x >= backButtonLocation.x      &&
+			click.x <  backButtonLocation.x + 16 &&
+			click.y >= backButtonLocation.y      &&
+			click.y <  backButtonLocation.y + 16 &&
+			currentLevel.number > 1
+		) {
+			loadLevel(currentLevel.number - 1);
+		} else if (
+			click.x >= forwardButtonLocation.x      &&
+			click.x <  forwardButtonLocation.x + 16 &&
+			click.y >= forwardButtonLocation.y      &&
+			click.y <  forwardButtonLocation.y + 16 &&
+			parseInt(localStorage.getItem("levelsUnlocked")) > currentLevel.number &&
+			currentLevel.number < 8
+		) {
+			loadLevel(currentLevel.number + 1);
+		} else if (!isPlaying) {
+			let x = Math.floor(click.x / 16);
+			let y = Math.floor(click.y / 16);
+
+			if (x >= 0 && x < 27 && y >= 0 && y < 10) {
+				let tile = currentLevel.data[x + 27 * y];
+
+				if (tile.type === "TJunctionOff") {
+					tile.type = "TJunctionOn";
+				} else if (tile.type === "TJunctionOn") {
+					tile.type = "TJunctionOff";
+				} else if (tile.type === "YJunction") {
+					tile.flipped = !tile.flipped;
+				}
+			}
 		}
+
+		unregisteredChange = true;
 	});
 }
 
@@ -343,6 +390,42 @@ function render() {
 		}
 	}
 
+	if (currentLevel.number > 1) {
+		for (let pixelY = 0; pixelY < 16; pixelY++) {
+			for (let pixelX = 0; pixelX < 16; pixelX++) {
+				let x = backButtonLocation.x + pixelX;
+				let y = backButtonLocation.y + pixelY;
+
+				if (x < 0 || x >= 432 || y < 0 || y >= 200) {
+					continue;
+				}
+
+				let buttonType = "leftButton";
+
+				if (
+					cursorLocation.x >= backButtonLocation.x      &&
+					cursorLocation.x <  backButtonLocation.x + 16 &&
+					cursorLocation.y >= backButtonLocation.y      &&
+					cursorLocation.y <  backButtonLocation.y + 16
+				) {
+					buttonType = buttonType + "2";
+				} else {
+					buttonType = buttonType + "1";
+				}
+
+				let [spriteX, spriteY] = getSpriteSheetPixelCoords({type: buttonType}, pixelX, pixelY);
+
+				let spriteIndex = 4 * (spriteX + 256 * spriteY);
+				let canvasIndex = 4 * (x + 432 * y);
+
+				imageData.data[canvasIndex + 0] = spriteSheet.data[spriteIndex + 0];
+				imageData.data[canvasIndex + 1] = spriteSheet.data[spriteIndex + 1];
+				imageData.data[canvasIndex + 2] = spriteSheet.data[spriteIndex + 2];
+				imageData.data[canvasIndex + 3] = spriteSheet.data[spriteIndex + 3];
+			}
+		}
+	}
+
 	for (let pixelY = 0; pixelY < 16; pixelY++) {
 		for (let pixelX = 0; pixelX < 16; pixelX++) {
 			let x = playButtonLocation.x + pixelX;
@@ -374,6 +457,44 @@ function render() {
 			imageData.data[canvasIndex + 1] = spriteSheet.data[spriteIndex + 1];
 			imageData.data[canvasIndex + 2] = spriteSheet.data[spriteIndex + 2];
 			imageData.data[canvasIndex + 3] = spriteSheet.data[spriteIndex + 3];
+		}
+	}
+
+	if (currentLevel.number < 8) {
+		for (let pixelY = 0; pixelY < 16; pixelY++) {
+			for (let pixelX = 0; pixelX < 16; pixelX++) {
+				let x = forwardButtonLocation.x + pixelX;
+				let y = forwardButtonLocation.y + pixelY;
+
+				if (x < 0 || x >= 432 || y < 0 || y >= 200) {
+					continue;
+				}
+
+				let buttonType = "rightButton";
+
+				if (parseInt(localStorage.getItem("levelsUnlocked")) <= currentLevel.number) {
+					buttonType = buttonType + "3";
+				} else if (
+					cursorLocation.x >= forwardButtonLocation.x      &&
+					cursorLocation.x <  forwardButtonLocation.x + 16 &&
+					cursorLocation.y >= forwardButtonLocation.y      &&
+					cursorLocation.y <  forwardButtonLocation.y + 16
+				) {
+					buttonType = buttonType + "2";
+				} else {
+					buttonType = buttonType + "1";
+				}
+
+				let [spriteX, spriteY] = getSpriteSheetPixelCoords({type: buttonType}, pixelX, pixelY);
+
+				let spriteIndex = 4 * (spriteX + 256 * spriteY);
+				let canvasIndex = 4 * (x + 432 * y);
+
+				imageData.data[canvasIndex + 0] = spriteSheet.data[spriteIndex + 0];
+				imageData.data[canvasIndex + 1] = spriteSheet.data[spriteIndex + 1];
+				imageData.data[canvasIndex + 2] = spriteSheet.data[spriteIndex + 2];
+				imageData.data[canvasIndex + 3] = spriteSheet.data[spriteIndex + 3];
+			}
 		}
 	}
 
@@ -468,6 +589,9 @@ let mapping3 = {
 }
 
 function loadLevel(number) {
+	isPlaying = false;
+	mapCollected = false;
+
 	currentLevel.number = number;
 
 	currentLevel.steve = {
@@ -545,14 +669,41 @@ function initializeLevelData() {
 		{
 			steve: {
 				x: 1,
-				y: 0,
+				y: 1,
 				direction: "east"
 			},
 			map: {
-				x: 10,
-				y: 5
+				x: 6,
+				y: 7
 			},
-			data: "s>10t>$_10sv$_10sv$_10sv$_10sv$_10sv$_10sv"
+			data:
+				"$" +
+				"_s>5t>$" +
+				"_6sv$" +
+				"_6sv$" +
+				"_t^s<4tv$" +
+				"_sv$" +
+				"_sv$" +
+				"_t<s>5"
+		},
+		{
+			steve: {
+				x: 3,
+				y: 3,
+				direction: "east"
+			},
+			map: {
+				x: 14,
+				y: 1
+			},
+			data:
+				"$" +
+				"_14sv$" +
+				"_14sv$" +
+				"_3s>4J>s>6y>$" +
+				"_7sv_6sv$" +
+				"_7sv_6sv$" +
+				"_7t<s>6tv"
 		}
 	]
 }
