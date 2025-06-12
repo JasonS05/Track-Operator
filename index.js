@@ -121,9 +121,33 @@ function mainLoop() {
 				steve.direction = undefined;
 			} else {
 				let tile = currentLevel.data[steve.x + 27 * steve.y];
-				let localDirection = transformDirection(steve.direction, tile.direction, tile.flipped, false);
 
-				switch (tile.type) {
+				if (tile.button) {
+					for (let i = 0; i < tile.switches.length; i++) {
+						let switchedTile = currentLevel.data[tile.switches[i].x + 27 * tile.switches[i].y];
+
+						switchedTile.switched = !switchedTile.switched;
+
+						new Audio("gearswitch.ogg").play();
+					}
+				}
+
+				let type = tile.type;
+				let flipped = tile.flipped;
+
+				if (tile.switched) {
+					if (tile.type === "TJunctionOff") {
+						type = "TJunctionOn";
+					} else if (tile.type === "TJunctionOn") {
+						type = "TJunctionOff";
+					} else if (tile.type === "YJunction") {
+						flipped = !flipped;
+					}
+				}
+
+				let localDirection = transformDirection(steve.direction, tile.direction, flipped, false);
+
+				switch (type) {
 				case "straight":
 					if (localDirection === "west" || localDirection === "east") {
 						localDirection = undefined;
@@ -134,7 +158,7 @@ function mainLoop() {
 				case "turn":
 				case "TJunctionOff":
 				case "TJunctionOn":
-					if (localDirection === "north" && tile.type != "TJunctionOff") {
+					if (localDirection === "north" && type != "TJunctionOff") {
 						localDirection = "east";
 					}
 
@@ -163,7 +187,7 @@ function mainLoop() {
 					break;
 				}
 
-				steve.direction = transformDirection(localDirection, tile.direction, tile.flipped, true);
+				steve.direction = transformDirection(localDirection, tile.direction, flipped, true);
 			}
 		}
 
@@ -250,6 +274,10 @@ function assignEventHandlers() {
 
 			if (isPlaying === false) {
 				mapCollected = false;
+
+				for (let i = 0; i < 270; i++) {
+					currentLevel.data[i].switched = false;
+				}
 			}
 
 			unregisteredChange = true;
@@ -315,7 +343,28 @@ function render() {
 						continue;
 					}
 
-					let [spriteX, spriteY] = getSpriteSheetPixelCoords(currentLevel.data[gridX + 27 * gridY], pixelX, pixelY);
+					let tile = currentLevel.data[gridX + 27 * gridY];
+
+					tile = {
+						type: tile.type,
+						direction: tile.direction,
+						flipped: tile.flipped,
+						steel: tile.steel,
+						button: tile.button,
+						switched: tile.switched
+					}
+
+					if (tile.switched) {
+						if (tile.type === "TJunctionOff") {
+							tile.type = "TJunctionOn";
+						} else if (tile.type === "TJunctionOn") {
+							tile.type = "TJunctionOff";
+						} else if (tile.type === "YJunction") {
+							tile.flipped = !tile.flipped;
+						}
+					}
+
+					let [spriteX, spriteY] = getSpriteSheetPixelCoords(tile, pixelX, pixelY);
 
 					let spriteIndex = 4 * (spriteX + 256 * spriteY);
 					let canvasIndex = 4 * (x + 432 * y);
