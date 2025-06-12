@@ -513,6 +513,42 @@ function render() {
 		}
 	}
 
+	if (!isPlaying) {
+		let tileX = Math.floor(cursorLocation.x / 16);
+		let tileY = Math.floor(cursorLocation.y / 16);
+
+		let tile = currentLevel.data[tileX + 27 * tileY];
+
+		if (tile && tile.button) {
+			for (let i = 0; i < tile.switches.length; i++) {
+				for (let pixelY = 0; pixelY < 16; pixelY++) {
+					for (let pixelX = 0; pixelX < 16; pixelX++) {
+						let x = tile.switches[i].x * 16 + pixelX;
+						let y = tile.switches[i].y * 16 + pixelY;
+
+						if (x < 0 || x >= 432 || y < 0 || y >= 200) {
+							continue;
+						}
+
+						let [spriteX, spriteY] = getSpriteSheetPixelCoords({type: "outline"}, pixelX, pixelY);
+
+						let spriteIndex = 4 * (spriteX + 256 * spriteY);
+						let canvasIndex = 4 * (x + 432 * y);
+
+						let spriteAlpha = spriteSheet.data[spriteIndex + 3];
+						let canvasAlpha = imageData.data[canvasIndex + 3];
+
+						// assumes data uses premultiplied alpha
+						imageData.data[canvasIndex + 0] = spriteSheet.data[spriteIndex + 0] + imageData.data[canvasIndex + 0] * (255 - spriteAlpha) / 255;
+						imageData.data[canvasIndex + 1] = spriteSheet.data[spriteIndex + 1] + imageData.data[canvasIndex + 1] * (255 - spriteAlpha) / 255;
+						imageData.data[canvasIndex + 2] = spriteSheet.data[spriteIndex + 2] + imageData.data[canvasIndex + 2] * (255 - spriteAlpha) / 255;
+						imageData.data[canvasIndex + 3] = 255 - (255 - spriteAlpha) * (255 - canvasAlpha) / 255;
+					}
+				}
+			}
+		}
+	}
+
 	ctx.putImageData(imageData, 2, 2);
 }
 
@@ -534,7 +570,8 @@ let mapping1 = {
 	"rightButton3": [13,    4 ],
 	"leftButton1" : [15,    5 ],
 	"leftButton2" : [14,    5 ],
-	"leftButton3" : [13,    5 ]
+	"leftButton3" : [13,    5 ],
+	"outline"     : [0,     8 ]
 };
 
 function getSpriteSheetPixelCoords(tile, x, y) {
@@ -678,17 +715,40 @@ function loadLevel(number) {
 			i++;
 		} else if (data[i] === "B") {
 			tile.button = true;
+
+			i++;
+
+			tile.switches = [];
+
+			while (data[i] !== undefined && data[i] !== ")") {
+				i++
+
+				if (data[i] === ")") {
+					break;
+				}
+
+				let [num1, length1] = parseNumber(data, i);
+
+				i += length1 + 1;
+
+				let [num2, length2] = parseNumber(data, i);
+
+				i += length2;
+
+				tile.switches.push({
+					x: num1,
+					y: num2
+				});
+			}
+
 			i++;
 		}
 
-		let iterations = 0;
+		let [num, length] = parseNumber(data, i);
 
-		while (data[i] >= "0" && data[i] <= "9") {
-			iterations = 10 * iterations + parseInt(data[i]);
-			i++;
-		}
+		let iterations = num || 1;
 
-		iterations = iterations || 1;
+		i += length;
 
 		while (iterations--) {
 			currentLevel.data[index] = tile;
@@ -704,6 +764,18 @@ function loadLevel(number) {
 		currentLevel.data[index] = {};
 		index++;
 	}
+}
+
+function parseNumber(data, i) {
+	let output = 0;
+	let n = 0;
+
+	while (data[i + n] >= "0" && data[i + n] <= "9") {
+		output = 10 * output + parseInt(data[i + n]);
+		n++;
+	}
+
+	return [output, n];
 }
 
 function initializeLevelData() {
@@ -803,9 +875,9 @@ function initializeLevelData() {
 				"$" +
 				"$" +
 				"_5 t^ s>2 j>S s>S2 y^fS s>S j<fS s>S s> j> s> j> s> j> s> t> $" +
-				"_5sv_2svS_2svS_svS_2sv_sv_sv_JvfSs>S$" +
-				"_5s^B_2svS_2svS_sv_2s^B_s^B_s^B_j^Ss>S$" +
-				"_5t<s>2j<Ss>S2tvS_sv_2t<s>j<s>j<s>tv"
+				"_5 s^ _2 s^S _2 s^S _ s^S _2 s^ _ s^ _ s^ _ JvfS s>S $" +
+				"_5 s^B(11,2) _2 s^S _2 s^S _ s^ _2 s^B(11,2 16,2 22,3) _ s^B(18,2 22,3 8,5) _ s^B(13,2 22,4) _ j^S s>S $" +
+				"_5 t< s>2 j<S s>S2 tvS _ s^ _2 t< s> j< s> j< s> tv"
 		}
 	]
 }
