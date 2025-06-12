@@ -395,7 +395,7 @@ function render() {
 					continue;
 				}
 
-				let [spriteX, spriteY] = getSpriteSheetPixelCoords({type: "map"}, pixelX, pixelY);
+				let [spriteX, spriteY] = getSpriteSheetPixelCoords({type: currentLevel.number === 9? "cake" : "map"}, pixelX, pixelY);
 
 				let spriteIndex = 4 * (spriteX + 256 * spriteY);
 				let canvasIndex = 4 * (x + 432 * y);
@@ -617,6 +617,7 @@ let mapping1 = {
 	"crossroads"  : [0,     5 ],
 	"arrow"       : [9.875, 13],
 	"map"         : [0,     15],
+	"cake"        : [1,     15],
 	"playButton1" : [15,    0 ],
 	"playButton2" : [14,    0 ],
 	"stopButton1" : [15,    2 ],
@@ -1014,6 +1015,23 @@ function initializeLevelData() {
 				"s^ t< y^ t> s^ t< s> c s>2 t> t^ s>2 cS yv cS s>2 c y>f t^ s> yv j> y^ tv $" +
 				"s^ t^ cB(9,6 11,9) y> t< j<f t> t< s>B(5,2) y^f y> t< s>B(20,3) s> cS s> cS s>2 c j^f t< s>B(20,2 20,3) y^ y> t< t> $" +
 				"t< J>f tv t< s>B(10,8 11,9) tv t< s>2 tv t< J>S j>S s>S j>fS s>S tvS t^ s> tv t< s>2 tv t< s>B(20,2 20,3 20,4) tv"
+		},
+		{
+			steve: {
+				x: 6,
+				y: 4,
+				direction: "east"
+			},
+			map: {
+				x: 20,
+				y: 4
+			},
+			data:
+				"$" +
+				"$" +
+				"$" +
+				"$" +
+				"_4 s>19"
 		}
 	]
 }
