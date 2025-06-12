@@ -39,13 +39,18 @@ let forwardButtonLocation = {
 };
 
 async function main() {
+	let promise = fetchSpriteSheet();
+
 	can = document.getElementById("can");
 	ctx = can.getContext("2d");
 
-	let promise = fetchSpriteSheet();
+	if (!parseInt(localStorage.getItem("levelsUnlocked"))) {
+		localStorage.setItem("levelsUnlocked", "1");
+	}
 
 	assignEventHandlers();
-	loadLevel(1);
+
+	loadLevel(parseInt(localStorage.getItem("levelsUnlocked")));
 
 	await promise;
 
@@ -60,10 +65,6 @@ function mainLoop() {
 	let dt = newTime - currentTime;
 	currentTime = newTime;
 
-	if (!parseInt(localStorage.getItem("levelsUnlocked"))) {
-		localStorage.setItem("levelsUnlocked", "1");
-	}
-
 	let steve = currentLevel.steve;
 
 	if (!isPlaying) {
@@ -75,6 +76,8 @@ function mainLoop() {
 			unregisteredChange = false;
 			render();
 		}
+
+		timeElapsed = 0;
 	} else {
 		timeElapsed += dt;
 
@@ -108,8 +111,10 @@ function mainLoop() {
 			steve.y = Math.round(steve.y);
 
 			if (steve.x === currentLevel.map.x && steve.y === currentLevel.map.y) {
-				localStorage.setItem("levelsUnlocked", (currentLevel.number + 1).toString());
+				localStorage.setItem("levelsUnlocked", Math.max(parseInt(localStorage.getItem("levelsUnlocked")), Math.min(currentLevel.number + 1, 9)).toString());
 				mapCollected = true;
+
+				new Audio("win.ogg").play();
 			}
 
 			if (steve.x < 0 || steve.x >= 27 || steve.y < 0 || steve.y >= 10) {
@@ -246,7 +251,9 @@ function assignEventHandlers() {
 			if (isPlaying === false) {
 				mapCollected = false;
 			}
-			
+
+			unregisteredChange = true;
+
 			return;
 		} else if (
 			click.x >= backButtonLocation.x      &&
@@ -262,7 +269,7 @@ function assignEventHandlers() {
 			click.y >= forwardButtonLocation.y      &&
 			click.y <  forwardButtonLocation.y + 16 &&
 			parseInt(localStorage.getItem("levelsUnlocked")) > currentLevel.number &&
-			currentLevel.number < 8
+			currentLevel.number < 9
 		) {
 			loadLevel(currentLevel.number + 1);
 		} else if (!isPlaying) {
@@ -272,12 +279,20 @@ function assignEventHandlers() {
 			if (x >= 0 && x < 27 && y >= 0 && y < 10) {
 				let tile = currentLevel.data[x + 27 * y];
 
-				if (tile.type === "TJunctionOff") {
-					tile.type = "TJunctionOn";
-				} else if (tile.type === "TJunctionOn") {
-					tile.type = "TJunctionOff";
-				} else if (tile.type === "YJunction") {
-					tile.flipped = !tile.flipped;
+				if (!tile.steel) {
+					if (tile.type === "TJunctionOff") {
+						tile.type = "TJunctionOn";
+
+						new Audio("gearswitch.ogg").play();
+					} else if (tile.type === "TJunctionOn") {
+						tile.type = "TJunctionOff";
+
+						new Audio("gearswitch.ogg").play();
+					} else if (tile.type === "YJunction") {
+						tile.flipped = !tile.flipped;
+
+						new Audio("gearswitch.ogg").play();
+					}
 				}
 			}
 		}
@@ -460,7 +475,7 @@ function render() {
 		}
 	}
 
-	if (currentLevel.number < 8) {
+	if (currentLevel.number < 9) {
 		for (let pixelY = 0; pixelY < 16; pixelY++) {
 			for (let pixelX = 0; pixelX < 16; pixelX++) {
 				let x = forwardButtonLocation.x + pixelX;
@@ -594,6 +609,25 @@ function loadLevel(number) {
 
 	currentLevel.number = number;
 
+	if (!levelData[number - 1]) {
+		currentLevel.steve = {
+			spawnX: 0,
+			spawnY: 0,
+			spawnDirection: "east"
+		}
+
+		currentLevel.map = {
+			x: 26,
+			y: 9
+		}
+
+		for (let i = 0; i < 270; i++) {
+			currentLevel.data[i] = {};
+		}
+
+		return;
+	}
+
 	currentLevel.steve = {
 		spawnX:         levelData[number - 1].steve.x,
 		spawnY:         levelData[number - 1].steve.y,
@@ -625,9 +659,13 @@ function loadLevel(number) {
 		tile.type = mapping2[data[i]];
 		i++;
 
-		if (tile.type) {
+		if (tile.type && tile.type !== "crossroads") {
 			tile.direction = mapping3[data[i]];
 			i++;
+		}
+
+		if (tile.type === "crossroads") {
+			tile.direction = "north";
 		}
 
 		if (data[i] === "f") {
@@ -656,6 +694,10 @@ function loadLevel(number) {
 			currentLevel.data[index] = tile;
 			index++;
 		}
+
+		while (data[i] === " ") {
+			i++;
+		}
 	}
 
 	while (index < 270) {
@@ -678,13 +720,13 @@ function initializeLevelData() {
 			},
 			data:
 				"$" +
-				"_s>5t>$" +
-				"_6sv$" +
-				"_6sv$" +
-				"_t^s<4tv$" +
-				"_sv$" +
-				"_sv$" +
-				"_t<s>5"
+				"_ s>5 t> $" +
+				"_6 s^ $" +
+				"_6 s^ $" +
+				"_ t^ s>4 tv $" +
+				"_ s^ $" +
+				"_ s^ $" +
+				"_ t< s>5"
 		},
 		{
 			steve: {
@@ -698,12 +740,72 @@ function initializeLevelData() {
 			},
 			data:
 				"$" +
-				"_14sv$" +
-				"_14sv$" +
-				"_3s>4J>s>6y>$" +
-				"_7sv_6sv$" +
-				"_7sv_6sv$" +
-				"_7t<s>6tv"
+				"_14 s^ $" +
+				"_14 s^ $" +
+				"_3 s>4 J> s>6 y> $" +
+				"_7 s^ _6 s^ $" +
+				"_7 s^ _6 s^ $" +
+				"_7 t< s>6 tv"
+		},
+		{
+			steve: {
+				x: 20,
+				y: 4,
+				direction: "west"
+			},
+			map: {
+				x: 9,
+				y: 8
+			},
+			data:
+				"$" +
+				"_4 t^ s>4 j<f s>3 y^ s> t> $" +
+				"_4 s^ _4 s^ _3 s^ _ s^ $" +
+				"_4 s^ _4 s^ _3 s^ _ s^ $" +
+				"_4 jvf s>4 jv _3 jvf s> c s>7 $" +
+				"_4 s^ _4 s^ _3 s^ _ s^ $" +
+				"_4 t< s>4 J^f _3 s^ _ s^ $" +
+				"_9 y< s>3 yvf s> tv $" +
+				"_9 s^"
+		},
+		{
+			steve: {
+				x: 24,
+				y: 1,
+				direction: "south"
+			},
+			map: {
+				x: 11,
+				y: 5
+			},
+			data:
+				"$" +
+				"_24 s^ $" +
+				"_6 t^S s> J<f s>4 j> s>3 y^f s>S J<fS s>S2 t> _ sv $" +
+				"_6 s^S _ s^S _4 s^ _3 s^ _ s^S _2 s^ _ s^ $" +
+				"_6 s^S _ s^S _4 s^_ t^ s> c s>S yvfS s>S _ s^ _ s^ $" +
+				"_6 y<fS s>S y>fS _2 s>2 tv _ s^ _ s^ _4 y< s> tv $" +
+				"_6 s^S _ s^S _4 t^ s> c s> y>f _4 s^ $" +
+				"_6 s^S _ s^S _4 s^ _ s^ _ s^ _4 s^ $" +
+				"_6 t<S s>S J<S s>S s>3 j>f s> yv s> j< s>4 tv"
+		},
+		{
+			steve: {
+				x: 7,
+				y: 5,
+				direction: "east"
+			},
+			map: {
+				x: 13,
+				y: 5
+			},
+			data:
+				"$" +
+				"$" +
+				"_5 t^ s>2 j>S s>S2 y^fS s>S j<fS s>S s> j> s> j> s> j> s> t> $" +
+				"_5sv_2svS_2svS_svS_2sv_sv_sv_JvfSs>S$" +
+				"_5s^B_2svS_2svS_sv_2s^B_s^B_s^B_j^Ss>S$" +
+				"_5t<s>2j<Ss>S2tvS_sv_2t<s>j<s>j<s>tv"
 		}
 	]
 }
