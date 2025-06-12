@@ -11,6 +11,7 @@ const speed = 5;
 let mapCollected = false;
 let isPlaying = false;
 let unregisteredChange = true;
+let levelsUnlocked = 1;
 
 let currentLevel = {
 	data: new Array(270)
@@ -46,11 +47,13 @@ async function main() {
 
 	if (!parseInt(localStorage.getItem("levelsUnlocked"))) {
 		localStorage.setItem("levelsUnlocked", "1");
+	} else {
+		levelsUnlocked = parseInt(localStorage.getItem("levelsUnlocked"));
 	}
 
 	assignEventHandlers();
 
-	loadLevel(parseInt(localStorage.getItem("levelsUnlocked")));
+	loadLevel(levelsUnlocked);
 
 	await promise;
 
@@ -111,7 +114,9 @@ function mainLoop() {
 			steve.y = Math.round(steve.y);
 
 			if (steve.x === currentLevel.map.x && steve.y === currentLevel.map.y) {
-				localStorage.setItem("levelsUnlocked", Math.max(parseInt(localStorage.getItem("levelsUnlocked")), Math.min(currentLevel.number + 1, 9)).toString());
+				levelsUnlocked = Math.max(levelsUnlocked, Math.min(currentLevel.number + 1, 9));
+				localStorage.setItem("levelsUnlocked", levelsUnlocked.toString());
+
 				mapCollected = true;
 
 				new Audio("win.ogg").play();
@@ -123,12 +128,14 @@ function mainLoop() {
 				let tile = currentLevel.data[steve.x + 27 * steve.y];
 
 				if (tile.button) {
+					if (tile.switches.length > 0 ) {
+						new Audio("gearswitch.ogg").play();
+					}
+
 					for (let i = 0; i < tile.switches.length; i++) {
 						let switchedTile = currentLevel.data[tile.switches[i].x + 27 * tile.switches[i].y];
 
 						switchedTile.switched = !switchedTile.switched;
-
-						new Audio("gearswitch.ogg").play();
 					}
 				}
 
@@ -296,7 +303,7 @@ function assignEventHandlers() {
 			click.x <  forwardButtonLocation.x + 16 &&
 			click.y >= forwardButtonLocation.y      &&
 			click.y <  forwardButtonLocation.y + 16 &&
-			parseInt(localStorage.getItem("levelsUnlocked")) > currentLevel.number &&
+			levelsUnlocked > currentLevel.number &&
 			currentLevel.number < 9
 		) {
 			loadLevel(currentLevel.number + 1);
@@ -536,7 +543,7 @@ function render() {
 
 				let buttonType = "rightButton";
 
-				if (parseInt(localStorage.getItem("levelsUnlocked")) <= currentLevel.number) {
+				if (levelsUnlocked <= currentLevel.number) {
 					buttonType = buttonType + "3";
 				} else if (
 					cursorLocation.x >= forwardButtonLocation.x      &&
@@ -724,19 +731,21 @@ function loadLevel(number) {
 
 	let data = levelData[number - 1].data;
 
-	let index = 0;
+	let x = 0;
+	let y = 0;
 	let tile;
 	let i = 0
 	while (i < data.length) {
 		tile = {};
 
 		if (data[i] === "$") {
-			let newIndex = index - (index % 27) + 27;
-
-			while (index < newIndex) {
-				currentLevel.data[index] = {};
-				index++;
+			while (x < 27) {
+				currentLevel.data[x + 27 * y] = {};
+				x++;
 			}
+
+			x = 0;
+			y++;
 
 			i++;
 			continue;
@@ -800,8 +809,16 @@ function loadLevel(number) {
 		i += length;
 
 		while (iterations--) {
-			currentLevel.data[index] = tile;
-			index++;
+			currentLevel.data[x + 27 * y] = {
+				type: tile.type,
+				direction: tile.direction,
+				flipped: tile.flipped,
+				steel: tile.steel,
+				button: tile.button,
+				switches: tile.switches
+			};
+
+			x++;
 		}
 
 		while (data[i] === " ") {
@@ -809,9 +826,14 @@ function loadLevel(number) {
 		}
 	}
 
-	while (index < 270) {
-		currentLevel.data[index] = {};
-		index++;
+	while (y < 10) {
+		while (x < 27) {
+			currentLevel.data[x + 27 * y] = {};
+			x++;
+		}
+
+		x = 0;
+		y++;
 	}
 }
 
@@ -902,7 +924,7 @@ function initializeLevelData() {
 			data:
 				"$" +
 				"_24 s^ $" +
-				"_6 t^S s> J<f s>4 j> s>3 y^f s>S J<fS s>S2 t> _ sv $" +
+				"_6 t^S s> J<f s>4 j> s>3 y^f s>S J<fS s>S2 t> _ s^ $" +
 				"_6 s^S _ s^S _4 s^ _3 s^ _ s^S _2 s^ _ s^ $" +
 				"_6 s^S _ s^S _4 s^_ t^ s> c s>S yvfS s>S _ s^ _ s^ $" +
 				"_6 y<fS s>S y>fS _2 s>2 tv _ s^ _ s^ _4 y< s> tv $" +
@@ -927,6 +949,71 @@ function initializeLevelData() {
 				"_5 s^ _2 s^S _2 s^S _ s^S _2 s^ _ s^ _ s^ _ JvfS s>S $" +
 				"_5 s^B(11,2) _2 s^S _2 s^S _ s^ _2 s^B(11,2 16,2 22,3) _ s^B(18,2 22,3 8,5) _ s^B(13,2 22,4) _ j^S s>S $" +
 				"_5 t< s>2 j<S s>S2 tvS _ s^ _2 t< s> j< s> j< s> tv"
+		},
+		{
+			steve: {
+				x: 0,
+				y: 9,
+				direction: "east"
+			},
+			map: {
+				x: 19,
+				y: 8
+			},
+			data:
+				"_8 t^ s> t> $" +
+				"_3 t^ s> t> _2 s^ _ s^ _ t^ s>2 s>B(14,9) y^ s>2 t> $" +
+				"_ t^ s> cB(14,9 15,9) s> j< s>2 j>f s>B(16,9) j< s> c s> t> _ s^ _2 s^ $" +
+				"_ s^ _ t< s>2 t> _2 t^ s>2 j>f s> c s> y> _2 s^ $" +
+				"_ s^ _4 s^ _2 s^ _2 t^ s> c s> j^fB(16,9) _2 s^ $" +
+				"_ t< s> y^ s>2 cB(15,9 16,9) s>2 jv _2 s^ _ t<B(14,9 15,9 16,9) s> yv s>2 tv $" +
+				"_3 s^B(14,9) _2 s^ _2 s^ _2 s^ $" +
+				"_3 s^ _2 s^ _2 s^ _2 s^ $" +
+				"_3 s^ _2 s^ _2 s^ _2 s^ _ s^S3 _2 s^S $" +
+				"s>3 yv s>2 yv s>2 yv s>2 j< s> J>fS3 s>S2 tvS"
+		},
+		{
+			steve: {
+				x: 7,
+				y: 2,
+				direction: "east"
+			},
+			map: {
+				x: 4,
+				y: 2
+			},
+			data:
+				"_3 t^S s>S j>S s>S s>2 t> $" +
+				"_3 s^S _ s^S _3 s^ _2 s>S y^fS s>S s> s>B(13,6) s> t>S $" +
+				"s>3 cS s> cS s>3 tv _3 s^S _4 s^S $" +
+				"_3 s^S _ s^S _7 s^ _4 J^S s> y^ s> t> $" +
+				"_3 s^S _ s^S _3 t^ s>B(5,5 8,5) s>2 y> _4 s^B(5,0) _ s^ _ s^ $" +
+				"_3 t<S s>S J<S s>S s> j> j>f s>B(13,6) s>2 c s>4 y> _ s^ _ s^ $" +
+				"_ t^ s> t> _4 t< s> s>B(13,1 5,5) s>2 y>f _4 t< s> cB(5,5) s> y> $" +
+				"_ s^B(5,0 13,6) _ s^ _9 s^ _6 s^ _ s^ $" +
+				"_ t< s> j< s>9 yv s>2 s>B(5,0) s>3 j>f s> tv"
+		},
+		{
+			steve: {
+				x: 3,
+				y: 3,
+				direction: "east"
+			},
+			map: {
+				x: 3,
+				y: 0
+			},
+			data:
+				"t^ s> t> s^S t^S cS t>S t^ s> t> t^ s>2 cS s>S3 J<f t> t^ s>B(20,2) c j> j<f s>2 t> $" +
+				"s^ t^ jv j^S j<S tvS s^S s^B(13,4) t^ j< j>f s>B(3,1) s> cS s>S2 j<fS y>fS s^ t< t> s^3 t^ t> s^ $" +
+				"s^3 t<S s>S y^fS tvS t< j>f s>3 y^S jvS t^S t>S t<S J^fS t< t> JvfS jv jvf c y> s^B(20,2) s^ $" +
+				"s^2 s^S s> t> s^S t^ s> j<f s> J> t> t<S cS J>f cS s>B(16,1 17,2) c t> s^ JvfS jv s^B(20,3 20,4) s^ s^B(20,4) s^2 $" +
+				"s^2 jvfS t>S s^2 t< s>B(5,2 11,4) tv t^ tv y< t> j^S s>S j>fS s> y>f s^ s^B(5,2) JvfS jv t< yv j>f tv s^ $" +
+				"s^ s^B(2,1) s^S t< tv t< s> j> s>S cS s>S jv t<S tvS t^ s>B(15,6) t> t< tv t< j>fS tv t^ s> t> t^ tv $" +
+				"s^2 t< s> t> t^ s> c s>S j>fS s>S j>f s>2 cS j>S cS s>2 t> t^ s>B(20,2 20,4) yv t> t< yv t> $" +
+				"s^ t< y^ t> s^ t< s> c s>2 t> t^ s>2 cS yv cS s>2 c y>f t^ s> yv j> y^ tv $" +
+				"s^ t^ cB(9,6 11,9) y> t< j<f t> t< s>B(5,2) y^f y> t< s>B(20,3) s> cS s> cS s>2 c j^f t< s>B(20,2 20,3) y^ y> t< t> $" +
+				"t< J>f tv t< s>B(10,8 11,9) tv t< s>2 tv t< J>S j>S s>S j>fS s>S tvS t^ s> tv t< s>2 tv t< s>B(20,2 20,3 20,4) tv"
 		}
 	]
 }
